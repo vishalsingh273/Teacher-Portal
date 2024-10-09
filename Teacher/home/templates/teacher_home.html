@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Portal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 90%;
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #newStudentModal {
+            display: none;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+            text-align: center;
+        }
+
+        #newStudentModal input {
+            margin: 10px 0;
+        }
+
+        .success-message {
+            color: green;
+        }
+
+        .error-message {
+            color: red;
+        }
+    </style>
+    <script>
+        let editingStudentId = null;
+
+        // Update student data function
+        function updateStudent(id, field, value) {
+            const data = {
+                id: id,
+                field: field,
+                value: value
+            };
+
+            fetch(`/update_student/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Student updated successfully!');
+                } else {
+                    alert('Error updating student: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating student');
+            });
+        }
+
+        // Delete student function
+        function deleteStudent(id) {
+            if (confirm("Are you sure you want to delete this student?")) {
+                fetch(`/delete_student/${id}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    },
+                }).then(response => response.json()).then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error deleting student: ' + (data.error || 'Unknown error'));
+                    }
+                });
+            }
+        }
+
+        // Add or update student function
+        function submitStudent() {
+            let name = document.getElementById('studentName').value;
+            let subject = document.getElementById('studentSubject').value;
+            let marks = document.getElementById('studentMarks').value;
+        
+            if (!name || !subject || !marks) {
+                alert('Please fill all fields.');
+                return;
+            }
+
+            const url = editingStudentId ? `/update_student/` : `/add_student/`;
+            const method = editingStudentId ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: method,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: editingStudentId,
+                    name: name,
+                    subject: subject,
+                    marks: parseInt(marks)
+                })
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    alert('Student ' + (editingStudentId ? 'updated' : 'added') + ' successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            }).catch(error => console.error('Error:', error));
+        }
+
+        // Show modal for adding/updating a student
+        function showModal(id = null) {
+            if (id) {
+                // Editing a student
+                editingStudentId = id;
+                const studentRow = document.querySelector(`tr[data-id='${id}']`);
+                document.getElementById('studentName').value = studentRow.querySelector('.student-name').innerText;
+                document.getElementById('studentSubject').value = studentRow.querySelector('.student-subject').innerText;
+                document.getElementById('studentMarks').value = studentRow.querySelector('.student-marks').innerText;
+                document.getElementById('modalHeader').innerText = 'Edit Student';
+            } else {
+                // Adding a new student
+                editingStudentId = null;
+                document.getElementById('studentName').value = '';
+                document.getElementById('studentSubject').value = '';
+                document.getElementById('studentMarks').value = '';
+                document.getElementById('modalHeader').innerText = 'Add New Student';
+            }
+            document.getElementById('newStudentModal').style.display = 'block';
+        }
+
+        // Hide modal
+        function hideModal() {
+            document.getElementById('newStudentModal').style.display = 'none';
+        }
+    </script>
+</head>
+<body>
+
+<div class="container">
+    <h2>Teacher Portal</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Subject</th>
+                <th>Marks</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr data-id="{{ student.id }}">
+                <td class="student-name">
+                    {{ student.name }}
+                </td>
+                <td class="student-subject">
+                    {{ student.subject }}
+                </td>
+                <td class="student-marks">
+                    {{ student.marks }}
+                </td>
+                <td>
+                    <button onclick="showModal({{ student.id }})">Edit</button>
+                    <button onclick="deleteStudent({{ student.id }})">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <button onclick="showModal()">Add New Student</button>
+
+    <!-- Modal for adding/updating student -->
+    <div id="newStudentModal">
+        <h3 id="modalHeader">Add New Student</h3>
+        <input type="text" id="studentName" placeholder="Name">
+        <input type="text" id="studentSubject" placeholder="Subject">
+        <input type="number" id="studentMarks" placeholder="Marks">
+        <button onclick="submitStudent()">Submit</button>
+        <button onclick="hideModal()">Close</button>
+    </div>
+</div>
+
+</body>
+</html>
